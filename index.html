@@ -6,7 +6,7 @@
 </style></head>
 <body><header><small>Интерактивный практикум</small><h1>Философия</h1><p>Главы 1–3 · По учебнику «Философия» (ред. М. И. Ивлева, 2018)</p></header>
 <main>
-<section class="panel" id="setup"><h2>Начать кроссворд</h2><p class="muted">Введите фамилию первой. Вариант зависит от первых двух букв фамилии.</p><div class="fields"><div><label for="student">Фамилия и имя *</label><input id="student" type="text" placeholder="Иванов Иван" maxlength="100" autocomplete="name"></div><div><label for="group">Учебная группа *</label><input id="group" type="text" placeholder="Например, ЭК-231" maxlength="50"></div></div><div style="margin-top:17px"><label for="topic">Тема</label><select id="topic"><option value="0" disabled>1. Предмет философии и её роль в обществе (временно закрыта)</option><option value="1" selected>2. Философия древнего мира</option><option value="2">3. Средневековая философия</option></select></div><div class="buttons"><button id="start">Начать решение →</button></div><p class="status" id="formStatus" role="status"></p></section>
+<section class="panel" id="setup"><h2>Начать кроссворд</h2><div class="fields"><div><label for="student">Фамилия и имя *</label><input id="student" type="text" placeholder="Иванов Иван" maxlength="100" autocomplete="name"></div><div><label for="group">Учебная группа *</label><input id="group" type="text" placeholder="Например, ЭК-231" maxlength="50"></div></div><div style="margin-top:17px"><label for="topic">Тема</label><select id="topic"><option value="0" selected>1. Предмет философии и её роль в обществе</option><option value="1">2. Философия древнего мира</option><option value="2">3. Средневековая философия</option></select></div><div class="buttons"><button id="start">Начать решение →</button></div><p class="status" id="formStatus" role="status"></p></section>
 <section class="panel" id="play"><div class="topline"><div><h2 id="topicTitle"></h2><div class="meta"><span id="who"></span><span id="count"></span><span id="timer"></span></div></div><button class="secondary" id="back">← К выбору темы</button></div><p class="muted tip">Нажмите на вопрос или клетку. Печатайте буквы с клавиатуры; повторное нажатие на пересечение переключает направление. Ё можно вводить как Е.</p><div class="cross-layout"><div class="boardwrap"><div id="board" class="board" aria-label="Сетка кроссворда"></div></div><div class="clues"><h3>По горизонтали</h3><div id="across" class="clue-list"></div><h3>По вертикали</h3><div id="down" class="clue-list"></div></div></div><div class="buttons"><button id="finish">Завершить и проверить</button><button id="clear" class="secondary">Очистить ответы</button></div><p class="status" id="playStatus" role="status"></p></section>
 <section class="panel" id="outcome"><h2>Результат кроссворда</h2><div class="meta" id="resultMeta"></div><div class="score" id="score"></div><div id="resultDetail" class="muted"></div><div class="results" id="resultWords" style="margin-top:18px"></div><div class="buttons"><button id="png">Скачать результат (PNG)</button><button class="secondary" id="retry">Повторить тему</button><button class="secondary" id="another">Другая тема</button></div><p class="muted">В PNG сохраняются имя, группа, тема, код варианта и результаты проверки.</p></section>
 </main><script>
@@ -58,6 +58,12 @@ function variantCode(name){
  return surname.toLocaleUpperCase("ru").replace(/[^А-ЯЁA-Z]/g,"").slice(0,2);
 }
 
+function variantLabel(code){
+ const letters="АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯABCDEFGHIJKLMNOPQRSTUVWXYZ";
+ const index=letters.indexOf(code[0])*letters.length+letters.indexOf(code[1]);
+ return String((index*101+137)%letters.length**2+1).padStart(4,"0");
+}
+
 function variantGrid(topic,code){
  // Hash the chapter and surname prefix, then use a seeded shuffle.
  let seed=2166136261;
@@ -98,12 +104,13 @@ function start(){const choice=$("topic").selectedOptions[0];
  if(!choice||choice.disabled){$("formStatus").textContent="Выберите доступную тему.";return}
  let name=$("student").value.trim(),group=$("group").value.trim();if(!name||!group){$("formStatus").textContent="Пожалуйста, заполните имя и группу.";return}
  const code=variantCode(name);
- if(code.length!==2){$("formStatus").textContent="Введите фамилию, начиная с двух букв.";return}
+ if(code.length!==2){$("formStatus").textContent="Проверьте поле «Фамилия и имя» и введите фамилию целиком.";return}
  const topic=Number(choice.value),plan=variantGrid(topic,code);
  if(!plan){$("formStatus").textContent="Не удалось собрать сетку для этого варианта.";return}
  $("formStatus").textContent="";
- state={name,group,topic,code,plan,values:new Map(),selected:plan.placed[0].i,begin:Date.now(),finished:false};
- $("topicTitle").textContent=(topic+1)+". "+TOPICS[topic].title;$("who").textContent=name+" · "+group+" · Вариант "+code;$("count").textContent=plan.placed.length+" слов";$("playStatus").textContent="";
+ const label=variantLabel(code);
+ state={name,group,topic,code:label,plan,values:new Map(),selected:plan.placed[0].i,begin:Date.now(),finished:false};
+ $("topicTitle").textContent=(topic+1)+". "+TOPICS[topic].title;$("who").textContent=name+" · "+group+" · Вариант "+label;$("count").textContent=plan.placed.length+" слов";$("playStatus").textContent="";
  const board=$("board");board.innerHTML="";board.style.gridTemplateColumns="repeat("+plan.width+",max-content)";
  for(let y=0;y<plan.height;y++)for(let x=0;x<plan.width;x++){const key=x+","+y,c=plan.grid.get(key),node=document.createElement("div");node.className=c?"cell":"gapcell";if(c){node.dataset.key=key;const starters=plan.placed.filter(z=>z.x===x&&z.y===y);node.innerHTML=(starters.length?"<sup>"+starters.map(word=>word.num).join("/")+"</sup>":"")+'<input aria-label="Клетка '+(x+1)+','+(y+1)+'" maxlength="1" autocapitalize="characters" autocomplete="off" spellcheck="false" inputmode="text">';
  const inp=node.querySelector("input");inp.addEventListener("focus",()=>{inp.select();let w=currentWord();if(!w||!c.words.some(z=>z.i===w.i))selectWord(c.words[0].i,false)});
