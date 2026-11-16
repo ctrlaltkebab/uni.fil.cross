@@ -9,7 +9,7 @@
 <body><header><small>Интерактивный практикум</small><h1>Философия</h1><p>Главы 1–3 · По учебнику «Философия» (ред. М. И. Ивлева, 2018)</p></header>
 <main>
 <section class="panel" id="setup"><h2>Начать кроссворд</h2><p class="muted">Сервер сохраняет имя и группу для проверки попытки. Результат записывается при сдаче.</p><div class="fields"><div><label for="student">Фамилия и имя *</label><input id="student" type="text" placeholder="Иванов Иван" maxlength="100" autocomplete="name"></div><div><label for="group">Учебная группа *</label><input id="group" type="text" placeholder="Например, ЭК-231" maxlength="50"></div></div><div style="margin-top:17px"><label for="topic">Тема</label><select id="topic"><option value="0" selected>1. Предмет философии и её роль в обществе</option><option value="1">2. Философия древнего мира</option><option value="2">3. Средневековая философия</option></select></div><div class="buttons"><button id="start">Начать решение →</button></div><p class="status" id="formStatus" role="status"></p></section>
-<section class="panel" id="play"><div class="topline"><div><h2 id="topicTitle"></h2><div class="meta"><span id="who"></span><span id="count"></span><span id="timer"></span></div></div><button class="secondary" id="back">← К выбору темы</button></div><p class="muted tip">Нажмите на вопрос или клетку. Печатайте буквы с клавиатуры; повторное нажатие на пересечение переключает направление. Ё можно вводить как Е.</p><div class="cross-layout"><div class="boardwrap"><div id="board" class="board" aria-label="Сетка кроссворда"></div></div><div class="clues"><h3>По горизонтали</h3><div id="across" class="clue-list"></div><h3>По вертикали</h3><div id="down" class="clue-list"></div></div></div><div class="buttons"><button id="finish">Завершить и проверить</button><button id="clear" class="secondary">Очистить ответы</button></div><p class="status" id="playStatus" role="status"></p></section>
+<section class="panel" id="play"><div class="topline"><div><h2 id="topicTitle"></h2><div class="meta"><span id="who"></span><span id="count"></span><span id="timer"></span></div></div><button class="secondary" id="back">← К выбору темы</button></div><p class="muted tip">Нажмите на вопрос или клетку. Печатайте буквы с клавиатуры; повторное нажатие на пересечение переключает направление. Ё можно вводить как Е.</p><div class="cross-layout"><div class="boardwrap"><div id="board" class="board" aria-label="Сетка кроссворда"></div></div><div class="clues"><h3>По горизонтали</h3><div id="across" class="clue-list"></div><h3>По вертикали</h3><div id="down" class="clue-list"></div></div></div><div class="buttons"><button id="finish">Завершить и проверить</button><button class="secondary" id="backupDownload" type="button" hidden>Скачать ответы для проверки</button><button id="clear" class="secondary">Очистить ответы</button></div><p class="status" id="playStatus" role="status"></p></section>
 <section class="panel" id="outcome"><h2>Результат кроссворда</h2><div class="meta" id="resultMeta"></div><div class="score" id="score"></div><div id="resultDetail" class="muted"></div><div class="results" id="resultWords" style="margin-top:18px"></div><div class="buttons"><button id="png">Скачать результат (PNG)</button><button class="secondary" id="retry">Повторить тему</button><button class="secondary" id="another">Другая тема</button></div><p class="muted">В PNG сохраняются имя, группа, тема, код варианта и результаты проверки.</p></section>
 
 <details id="teacherBank" class="panel teacher-panel">
@@ -36,7 +36,7 @@
   <div id="teacherQuestions"></div>
  </div>
 </details>
-</main><script>
+</main><script src="backup-grids.js?v=1"></script><script>
 "use strict";
 const TOPIC_TITLES=["Предмет философии и её роль в обществе","Философия древнего мира","Средневековая философия"];
 const $=id=>document.getElementById(id);
@@ -52,19 +52,24 @@ function selectWord(id,focus=true){state.selected=id;const w=currentWord();if(!w
 function focusCell(x,y){const el=document.querySelector('[data-key="'+x+','+y+'"] input');if(!el)return;el.focus({preventScroll:true});el.select();const wrap=el.closest(".boardwrap"),cell=el.getBoundingClientRect(),frame=wrap.getBoundingClientRect();if(cell.left<frame.left)wrap.scrollLeft-=frame.left-cell.left;else if(cell.right>frame.right)wrap.scrollLeft+=cell.right-frame.right;}
 async function start(){const choice=$("topic").selectedOptions[0];
  if(!choice||choice.disabled){$("formStatus").textContent="Выберите доступную тему.";return}
- let name=$("student").value.trim(),group=$("group").value.trim();if(!name||!group){$("formStatus").textContent="Пожалуйста, заполните имя и группу.";return}
+ let name=$("student").value.trim(),group=$("group").value.trim();if(!name||!group||name.length>100||group.length>50){$("formStatus").textContent="Пожалуйста, заполните имя и группу.";return}
  const button=$("start");
  if(button.disabled)return;
  button.disabled=$("retry").disabled=true;
  $("formStatus").textContent="";
  let payload;
  try {payload=await api("start",{name,group,topic:Number(choice.value)});}
- catch(error){show("setup");$("formStatus").textContent=error.message;return}
+ catch(error){
+  if(!error.unavailable){show("setup");$("formStatus").textContent=error.message;return}
+  payload=backupAttempt(Number(choice.value),name);
+ }
  finally{button.disabled=$("retry").disabled=false}
  const {id,topic,label,plan,begin}=payload;
  plan.grid=new Map(plan.grid);
  state={id,name,group,topic,code:label,plan,values:new Map(),selected:plan.placed[0].i,begin,finished:false};
- $("topicTitle").textContent=(topic+1)+". "+TOPIC_TITLES[topic];$("who").textContent=name+" · "+group+" · Вариант "+label;$("count").textContent=plan.placed.length+" слов";$("playStatus").textContent="";
+ $("backupDownload").hidden=true;
+ $("finish").textContent=id?"Завершить и проверить":"Сохранить ответы";
+ $("topicTitle").textContent=(topic+1)+". "+TOPIC_TITLES[topic];$("who").textContent=name+" · "+group+" · Вариант "+label;$("count").textContent=plan.placed.length+" слов";$("playStatus").textContent=id?"":"Резервный режим. Скачайте ответы в конце и покажите преподавателю для проверки.";
  const board=$("board");board.innerHTML="";board.style.gridTemplateColumns="repeat("+plan.width+",max-content)";
  for(let y=0;y<plan.height;y++)for(let x=0;x<plan.width;x++){const key=x+","+y,c=plan.grid.get(key),node=document.createElement("div");node.className=c?"cell":"gapcell";if(c){node.dataset.key=key;const starters=plan.placed.filter(z=>z.x===x&&z.y===y);node.innerHTML=(starters.length?"<sup>"+starters.map(word=>word.num).join("/")+"</sup>":"")+'<input aria-label="Клетка '+(x+1)+','+(y+1)+'" maxlength="1" autocapitalize="characters" autocomplete="off" spellcheck="false" inputmode="text">';
  const inp=node.querySelector("input");inp.addEventListener("focus",()=>{inp.select();let w=currentWord();if(!w||!c.words.some(z=>z.i===w.i))selectWord(c.words[0].i,false)});
@@ -76,28 +81,100 @@ async function start(){const choice=$("topic").selectedOptions[0];
  selectWord(state.selected,false);show("play");clearInterval(tick);tick=setInterval(()=>{if(state&&!state.finished)$("timer").textContent="Время: "+clock(Math.floor((Date.now()-state.begin)/1000))},1000);$("timer").textContent="Время: 00:00"}
 function move(key,delta){const w=currentWord(),cells=[];for(let i=0;i<w.length;i++)cells.push((w.x+(w.dir==="a"?i:0))+","+(w.y+(w.dir==="d"?i:0)));const at=cells.indexOf(key),next=cells[Math.max(0,Math.min(cells.length-1,at+delta))];if(next){const [x,y]=next.split(",");focusCell(x,y)}}
 function clock(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+function backupAttempt(topic,name){
+ const prefix=name.toLocaleUpperCase("ru").split(/\s+/)[0].replace(/[^А-ЯЁA-Z]/g,"").slice(0,2);
+ let hash=0;for(const ch of prefix)hash=(hash*31+ch.charCodeAt(0))>>>0;
+ const sets=BACKUP_GRIDS[topic],index=hash%sets.length,source=sets[index],cells=new Map();
+ for(const word of source.placed){
+  for(let i=0;i<word.length;i++){
+   const x=word.x+(word.dir==="a"?i:0),y=word.y+(word.dir==="d"?i:0),key=x+","+y;
+   if(!cells.has(key))cells.set(key,{x,y,words:[]});
+   cells.get(key).words.push(word);
+  }
+ }
+ return {id:null,topic,label:"Р-"+(index+1),begin:Date.now(),plan:{...source,grid:[...cells]}};
+}
+function unavailable(){
+ return Object.assign(new Error("Сервер проверки недоступен."),{unavailable:true});
+}
 async function api(route,body){
- const response=await fetch("https://uni-fil-cross-api.royal-lark-4422.chatgpt.site/api/"+route,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
- if(!response.headers.get("Content-Type")?.includes("application/json"))throw new Error("Сервер недоступен.");
- const value=await response.json();
- if(!response.ok)throw new Error(value.error || "Не удалось выполнить запрос.");
- return value;
+ const controller=new AbortController();
+ const timeout=setTimeout(()=>controller.abort(),6500);
+ try{
+  let response,value;
+  try{
+   response=await fetch("https://uni-fil-cross-api.royal-lark-4422.chatgpt.site/api/"+route,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:controller.signal});
+   value=await response.json();
+  }catch{throw unavailable()}
+  if(response.status>=500)throw unavailable();
+  if(!response.ok)throw new Error(value.error||"Не удалось выполнить запрос.");
+  return value;
+ }finally{clearTimeout(timeout)}
+}
+function manualResult(current){
+ return {manual:true,date:new Date().toLocaleString("ru-RU"),rows:current.plan.placed.map(word=>{
+  let entered="";
+  for(let i=0;i<word.length;i++){
+   const x=word.x+(word.dir==="a"?i:0),y=word.y+(word.dir==="d"?i:0);
+   entered+=current.values.get(x+","+y)||"·";
+  }
+  return {num:word.num,dir:word.dir,entered,clue:word.clue};
+ })};
 }
 async function finish(){
  if(!state||state.finished||$("finish").disabled)return;
  const current=state;
  $("finish").disabled=true;
  let result;
- try{result=await api("finish",{id:current.id,values:Object.fromEntries(current.values)});}
- catch(error){if(state===current)$("playStatus").textContent=error.message;return}
+ try{result=current.id?await api("finish",{id:current.id,values:Object.fromEntries(current.values)}):manualResult(current);}
+ catch(error){
+  if(state===current){
+   $("playStatus").textContent=error.message+" Ответы остались в сетке. Скачайте их для ручной проверки или попробуйте сдать ещё раз.";
+   $("backupDownload").hidden=false;
+  }
+  return;
+ }
  finally{$("finish").disabled=false}
  if(state!==current||$("play").style.display!=="block")return;
  const {rows,correct,all,seconds,percent}=result;
  state.finished=true;clearInterval(tick);state.result=result;
  $("resultMeta").innerHTML="<span><b>"+escapeHTML(state.name)+"</b></span><span>Группа: "+escapeHTML(state.group)+"</span><span>Тема "+(state.topic+1)+" · Вариант "+state.code+"</span><span>"+escapeHTML(state.result.date)+"</span>";
- $("score").textContent=percent+"%";$("resultDetail").textContent="Верно: "+correct+" из "+all+" слов · Время: "+clock(seconds);
- $("resultWords").innerHTML=rows.map(r=>'<div class="result-word '+(r.correct?"pass":"fail")+'">'+(r.correct?"✓":"✕")+" "+r.num+(r.dir==="a"?" → ":" ↓ ")+escapeHTML(r.entered)+(r.correct?"":" (неверно)")+"</div>").join("");
+ $("score").textContent=result.manual?"Без балла":percent+"%";$("resultDetail").textContent=result.manual?"Скачайте ответы и покажите преподавателю для ручной проверки.":("Верно: "+correct+" из "+all+" слов · Время: "+clock(seconds));
+ $("resultWords").innerHTML=rows.map(r=>result.manual?'<div class="result-word">'+r.num+" "+escapeHTML(r.entered)+"</div>":'<div class="result-word '+(r.correct?"pass":"fail")+'">'+(r.correct?"✓":"✕")+" "+r.num+(r.dir==="a"?" → ":" ↓ ")+escapeHTML(r.entered)+(r.correct?"":" (неверно)")+"</div>").join("");
  show("outcome")}
-function imageResult(){if(!state?.result)return;const r=state.result,canvas=document.createElement("canvas"),ctx=canvas.getContext("2d");const width=1100,rowH=38,h=420+Math.ceil(r.rows.length/2)*rowH;canvas.width=width*2;canvas.height=h*2;ctx.scale(2,2);ctx.fillStyle="#f7faf8";ctx.fillRect(0,0,width,h);ctx.fillStyle="#173047";ctx.fillRect(0,0,width,112);ctx.fillStyle="#ffffff";ctx.font="bold 34px Georgia";ctx.fillText("Результат кроссворда",45,57);ctx.font="20px Georgia";ctx.fillText("Философия",45,89);ctx.fillStyle="#243746";ctx.font="bold 25px Georgia";ctx.fillText(state.name,45,155,width-90);ctx.font="20px Georgia";ctx.fillText("Группа: "+state.group,45,190,width-90);ctx.fillText("Тема "+(state.topic+1)+": "+TOPIC_TITLES[state.topic]+" · Вариант "+state.code,45,226,width-90);ctx.fillText("Дата: "+r.date,45,262);ctx.fillStyle="#167461";ctx.font="bold 68px Georgia";ctx.fillText(r.percent+"%",45,349);ctx.fillStyle="#445e68";ctx.font="22px Georgia";ctx.fillText("Правильно "+r.correct+" из "+r.all+" · Время "+clock(r.seconds),260,341);ctx.strokeStyle="#cad9d4";ctx.beginPath();ctx.moveTo(45,385);ctx.lineTo(width-45,385);ctx.stroke();r.rows.forEach((z,i)=>{const col=i%2,row=Math.floor(i/2),x=45+col*525,y=420+row*rowH;ctx.fillStyle=z.correct?"#196d59":"#b04d44";ctx.font="19px Georgia";ctx.fillText((z.correct?"✓ ":"✕ ")+z.num+(z.dir==="a"?" → ":" ↓ ")+z.entered,x,y)});const filename="Кроссворд_тема"+(state.topic+1)+"_"+state.code+"_"+state.group.replace(/[^А-Яа-яЁёA-Za-z0-9_-]/g,"_")+".png";canvas.toBlob(blob=>{if(!blob)return;const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000)},"image/png")}
+function imageResult(){
+ if(!state?.result)return;
+ if(state.result.manual){downloadManual(state,state.result);return}
+ const r=state.result,canvas=document.createElement("canvas"),ctx=canvas.getContext("2d");const width=1100,rowH=38,h=420+Math.ceil(r.rows.length/2)*rowH;canvas.width=width*2;canvas.height=h*2;ctx.scale(2,2);ctx.fillStyle="#f7faf8";ctx.fillRect(0,0,width,h);ctx.fillStyle="#173047";ctx.fillRect(0,0,width,112);ctx.fillStyle="#ffffff";ctx.font="bold 34px Georgia";ctx.fillText("Результат кроссворда",45,57);ctx.font="20px Georgia";ctx.fillText("Философия",45,89);ctx.fillStyle="#243746";ctx.font="bold 25px Georgia";ctx.fillText(state.name,45,155,width-90);ctx.font="20px Georgia";ctx.fillText("Группа: "+state.group,45,190,width-90);ctx.fillText("Тема "+(state.topic+1)+": "+TOPIC_TITLES[state.topic]+" · Вариант "+state.code,45,226,width-90);ctx.fillText("Дата: "+r.date,45,262);ctx.fillStyle="#167461";ctx.font="bold 68px Georgia";ctx.fillText(r.percent+"%",45,349);ctx.fillStyle="#445e68";ctx.font="22px Georgia";ctx.fillText("Правильно "+r.correct+" из "+r.all+" · Время "+clock(r.seconds),260,341);ctx.strokeStyle="#cad9d4";ctx.beginPath();ctx.moveTo(45,385);ctx.lineTo(width-45,385);ctx.stroke();r.rows.forEach((z,i)=>{const col=i%2,row=Math.floor(i/2),x=45+col*525,y=420+row*rowH;ctx.fillStyle=z.correct?"#196d59":"#b04d44";ctx.font="19px Georgia";ctx.fillText((z.correct?"✓ ":"✕ ")+z.num+(z.dir==="a"?" → ":" ↓ ")+z.entered,x,y)});const filename="Кроссворд_тема"+(state.topic+1)+"_"+state.code+"_"+state.group.replace(/[^А-Яа-яЁёA-Za-z0-9_-]/g,"_")+".png";canvas.toBlob(blob=>{if(!blob)return;const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000)},"image/png")}
+function downloadManual(current,result){
+ const canvas=document.createElement("canvas");
+ canvas.width=1300;canvas.height=260+result.rows.length*110;
+ const ctx=canvas.getContext("2d");
+ ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.fillStyle="#173047";ctx.font="bold 38px Georgia";
+ ctx.fillText("Ответы к кроссворду · ручная проверка",40,62);
+ ctx.font="25px Georgia";
+ ctx.fillText(current.name+" · "+current.group,40,112,1220);
+ ctx.fillText("Тема "+(current.topic+1)+": "+TOPIC_TITLES[current.topic]+" · Вариант "+current.code,40,154,1220);
+ ctx.fillText(result.date,40,196);
+ result.rows.forEach((row,i)=>{
+  const y=250+i*110;
+  ctx.font="bold 24px Georgia";ctx.fillText(row.num+(row.dir==="a"?" → ":" ↓ ")+row.entered,40,y,1220);
+  ctx.font="23px Georgia";
+  let line="",at=y+31;
+  for(const word of row.clue.split(/\s+/)){
+   if(line&&ctx.measureText(line+" "+word).width>1220){ctx.fillText(line,40,at);line=word;at+=27}
+   else line+=(line?" ":"")+word;
+  }
+  ctx.fillText(line,40,at,1220);
+ });
+ canvas.toBlob(blob=>{
+  if(!blob)return;
+  const a=document.createElement("a"),url=URL.createObjectURL(blob);
+  a.href=url;a.download="Кроссворд_ответы_"+current.code+".png";
+  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);
+ },"image/png");
+}
+$("backupDownload").onclick=()=>{if(state)downloadManual(state,manualResult(state))};
 $("start").onclick=start;$("finish").onclick=finish;$("png").onclick=imageResult;$("retry").onclick=start;$("another").onclick=()=>(show("setup"));$("back").onclick=()=>show("setup");$("clear").onclick=()=>{if(confirm("Очистить все ответы этого кроссворда?")){$("board").querySelectorAll("input").forEach(x=>x.value="");state.values.clear()}}; 
 </script><script defer src="teacher-bank-server.js"></script></body></html>
