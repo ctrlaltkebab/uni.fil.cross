@@ -5,6 +5,14 @@
 @media print{header,.buttons,#setup,.clues,.tip{display:none!important}main{padding:5px}#outcome{display:block!important}}
 
 .teacher-panel h2{margin-bottom:8px}.teacher-panel summary{cursor:pointer;font-weight:bold;font-size:20px;color:#173047}.teacher-panel summary:focus-visible,.teacher-panel button:focus-visible{outline:2px solid #14685f;outline-offset:3px}.teacher-panel form,.teacher-panel .teacher-toolbar{margin-top:16px}.teacher-panel input[type=password]{width:100%;max-width:330px;padding:11px;border:1px solid #cbd8d7;border-radius:9px;font:16px Georgia,serif}.teacher-toolbar label{margin-top:12px}.teacher-toolbar select{max-width:720px}.teacher-question{border-top:1px solid #dfe6e4;padding:16px 0 8px}.teacher-question h3{font-size:18px;font-weight:normal;margin:6px 0 10px}.teacher-question details{margin-top:6px}.teacher-question summary{font-size:15px;color:#14685f}.teacher-question p{margin:7px 0;line-height:1.4}.teacher-picked{margin:15px 0 0;padding:0 14px;background:#edf6f3;border-radius:9px}.teacher-picked:empty{display:none}
+.practice-topic{display:flex;align-items:end;gap:12px;flex-wrap:wrap}
+.practice-topic>div{flex:1 1 300px}.practice-topic button{align-self:end}
+.practice-run{margin-top:20px;padding:15px 18px;background:#edf6f3;border-radius:9px}
+.practice-run h3{font-size:20px;font-weight:normal;line-height:1.35}
+.practice-run input{max-width:460px}
+.practice-feedback{margin:12px 0 0;min-height:1.35em;font-weight:bold}
+.practice-feedback[data-state=correct]{color:#14685f}
+.practice-feedback[data-state=wrong]{color:#8a3129}
 </style></head>
 <body><header><small>Интерактивный практикум</small><h1>Философия</h1><p>Главы 1–3 · По учебнику «Философия» (ред. М. И. Ивлева, 2018)</p></header>
 <main>
@@ -12,6 +20,28 @@
 <section class="panel" id="play"><div class="topline"><div><h2 id="topicTitle"></h2><div class="meta"><span id="who"></span><span id="count"></span><span id="timer"></span></div></div><button class="secondary" id="back">← К выбору темы</button></div><p class="muted tip">Нажмите на вопрос или клетку. Печатайте буквы с клавиатуры; повторное нажатие на пересечение переключает направление. Ё можно вводить как Е.</p><div class="cross-layout"><div class="boardwrap"><div id="board" class="board" aria-label="Сетка кроссворда"></div></div><div class="clues"><h3>По горизонтали</h3><div id="across" class="clue-list"></div><h3>По вертикали</h3><div id="down" class="clue-list"></div></div></div><div class="buttons"><button id="finish">Завершить и проверить</button><button id="clear" class="secondary">Очистить ответы</button></div><p class="status" id="playStatus" role="status"></p></section>
 <section class="panel" id="outcome"><h2>Результат кроссворда</h2><div class="meta" id="resultMeta"></div><div class="score" id="score"></div><div id="resultDetail" class="muted"></div><div class="results" id="resultWords" style="margin-top:18px"></div><div class="buttons"><button id="png">Скачать результат (PNG)</button><button class="secondary" id="retry">Повторить тему</button><button class="secondary" id="another">Другая тема</button></div><p class="muted">В PNG сохраняются имя, группа, тема, код варианта и результаты проверки.</p></section>
 
+<details id="practice" class="panel teacher-panel practice-panel">
+ <summary>Тренировка для студента</summary>
+ <p class="muted">Выберите тему и отвечайте на вопросы по одному. Можно проверить свой вариант или сразу открыть ответ.</p>
+ <div class="practice-topic">
+  <div><label for="practiceTopic">Тема тренировки</label><select id="practiceTopic"></select></div>
+  <button id="practiceStart" type="button">Начать тренировку</button>
+ </div>
+ <div id="practiceRun" class="practice-run" hidden>
+  <p id="practiceProgress" class="muted"></p>
+  <h3 id="practiceQuestion" tabindex="-1"></h3>
+  <form id="practiceForm">
+   <label for="practiceAnswer">Ваш ответ</label>
+   <input id="practiceAnswer" type="text" maxlength="100" autocomplete="off" spellcheck="false">
+   <div class="buttons">
+    <button id="practiceCheck" type="submit">Проверить</button>
+    <button id="practiceReveal" class="secondary" type="button">Показать ответ</button>
+    <button id="practiceNext" class="secondary" type="button">Следующий вопрос</button>
+   </div>
+  </form>
+  <p id="practiceFeedback" class="practice-feedback" role="status"></p>
+ </div>
+</details>
 <details id="teacherBank" class="panel teacher-panel">
  <summary>Банк вопросов для преподавателя</summary>
  <form id="teacherUnlock">
@@ -158,4 +188,98 @@ function finish(){if(!state||state.finished)return;const p=state.plan,rows=p.pla
  show("outcome")}
 function imageResult(){if(!state?.result)return;const r=state.result,canvas=document.createElement("canvas"),ctx=canvas.getContext("2d");const width=1100,rowH=38,h=420+Math.ceil(r.rows.length/2)*rowH;canvas.width=width*2;canvas.height=h*2;ctx.scale(2,2);ctx.fillStyle="#f7faf8";ctx.fillRect(0,0,width,h);ctx.fillStyle="#173047";ctx.fillRect(0,0,width,112);ctx.fillStyle="#ffffff";ctx.font="bold 34px Georgia";ctx.fillText("Результат кроссворда",45,57);ctx.font="20px Georgia";ctx.fillText("Философия",45,89);ctx.fillStyle="#243746";ctx.font="bold 25px Georgia";ctx.fillText(state.name,45,155,width-90);ctx.font="20px Georgia";ctx.fillText("Группа: "+state.group,45,190,width-90);ctx.fillText("Тема "+(state.topic+1)+": "+TOPICS[state.topic].title+" · Вариант "+state.code,45,226,width-90);ctx.fillText("Дата: "+r.date,45,262);ctx.fillStyle="#167461";ctx.font="bold 68px Georgia";ctx.fillText(r.percent+"%",45,349);ctx.fillStyle="#445e68";ctx.font="22px Georgia";ctx.fillText("Правильно "+r.correct+" из "+r.all+" · Время "+clock(r.seconds),260,341);ctx.strokeStyle="#cad9d4";ctx.beginPath();ctx.moveTo(45,385);ctx.lineTo(width-45,385);ctx.stroke();r.rows.forEach((z,i)=>{const col=i%2,row=Math.floor(i/2),x=45+col*525,y=420+row*rowH;ctx.fillStyle=z.correct?"#196d59":"#b04d44";ctx.font="19px Georgia";ctx.fillText((z.correct?"✓ ":"✕ ")+z.num+(z.dir==="a"?" → ":" ↓ ")+z.entered,x,y)});const filename="Кроссворд_тема"+(state.topic+1)+"_"+state.code+"_"+state.group.replace(/[^А-Яа-яЁёA-Za-z0-9_-]/g,"_")+".png";canvas.toBlob(blob=>{if(!blob)return;const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000)},"image/png")}
 $("start").onclick=start;$("finish").onclick=finish;$("png").onclick=imageResult;$("retry").onclick=start;$("another").onclick=()=>(show("setup"));$("back").onclick=()=>show("setup");$("clear").onclick=()=>{if(confirm("Очистить все ответы этого кроссворда?")){$("board").querySelectorAll("input").forEach(x=>x.value="");state.values.clear()}}; 
+(() => {
+  const details = $("practice");
+  const topic = $("practiceTopic");
+  const answer = $("practiceAnswer");
+  const feedback = $("practiceFeedback");
+  const question = $("practiceQuestion");
+  const start = $("practiceStart");
+  const next = $("practiceNext");
+  const check = $("practiceCheck");
+  const reveal = $("practiceReveal");
+  let deck = [];
+  let position = 0;
+  let current = null;
+
+  TOPICS.forEach((item, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = (index + 1) + ". " + item.title;
+    topic.append(option);
+  });
+
+  function showQuestion() {
+    current = deck[position];
+    $("practiceProgress").textContent = "Вопрос " + (position + 1) + " из " + deck.length;
+    question.textContent = current[1];
+    answer.value = "";
+    answer.disabled = false;
+    check.disabled = false;
+    reveal.disabled = false;
+    feedback.textContent = "";
+    delete feedback.dataset.state;
+    next.textContent = position + 1 < deck.length ? "Следующий вопрос" : "Завершить тренировку";
+    question.focus();
+  }
+
+  function startRound() {
+    deck = Object.values(TOPICS[Number(topic.value)].sections).flat();
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    position = 0;
+    $("practiceRun").hidden = false;
+    start.textContent = "Начать заново";
+    showQuestion();
+  }
+
+  function showAnswer(correct) {
+    feedback.textContent = (correct ? "Верно. " : "Ответ: ") + current[0];
+    feedback.dataset.state = "correct";
+    answer.disabled = true;
+    check.disabled = true;
+    reveal.disabled = true;
+  }
+
+  start.addEventListener("click", startRound);
+  topic.addEventListener("change", () => {
+    current = null;
+    $("practiceRun").hidden = true;
+    start.textContent = "Начать тренировку";
+  });
+  $("practiceForm").addEventListener("submit", event => {
+    event.preventDefault();
+    if (!current || check.disabled) return;
+    if (!norm(answer.value)) {
+      feedback.textContent = "Впишите свой ответ.";
+      delete feedback.dataset.state;
+    } else if (norm(answer.value) === norm(current[0])) {
+      showAnswer(true);
+      next.focus();
+    } else {
+      feedback.textContent = "Ответ не совпал. Можно попробовать ещё раз или открыть ответ.";
+      feedback.dataset.state = "wrong";
+      answer.focus();
+    }
+  });
+  reveal.addEventListener("click", () => {
+    if (!current) return;
+    showAnswer(false);
+    next.focus();
+  });
+  next.addEventListener("click", () => {
+    if (!current) return;
+    if (++position < deck.length) {
+      showQuestion();
+    } else {
+      current = null;
+      $("practiceRun").hidden = true;
+      start.textContent = "Пройти тему ещё раз";
+      start.focus();
+    }
+  });
+  if (location.hash === "#practice") details.open = true;
+})();
 </script><script defer src="teacher-bank.js?v=sections"></script></body></html>
