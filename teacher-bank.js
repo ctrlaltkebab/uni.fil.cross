@@ -9,6 +9,9 @@
   const selector = get("teacherTopic");
   const picked = get("teacherPicked");
   const questions = get("teacherQuestions");
+  const seminarTab = get("teacherSeminars");
+  const crosswordTab = get("teacherCrossword");
+  let seminarTopics = null;
   let topics = null;
   let lastPick = -1;
 
@@ -49,10 +52,12 @@
     tag.className = "muted";
     const details = document.createElement("details");
     details.append(
-      line("summary", "Ориентир для ответа"),
-      line("p", question.answer),
-      line("small", topic.source + " · " + (/^(Кн\.|РПД)/.test(question.pages) ? "" : "с. ") + question.pages)
+      line("summary", question.pages ? "Ориентир для ответа" : "Показать ответ"),
+      line("p", question.answer)
     );
+    if (question.pages) {
+      details.append(line("small", topic.source + " · " + (/^(Кн\.|РПД)/.test(question.pages) ? "" : "с. ") + question.pages));
+    }
     card.append(tag, line("h3", question.prompt), details);
     return card;
   }
@@ -79,14 +84,8 @@
     }
     button.disabled = true;
     try {
-      topics = await decodeBank(password);
-      selector.replaceChildren(...topics.map((topic, index) => {
-        const option = line("option", topic.id + ". " + topic.title);
-        option.value = String(index);
-        return option;
-      }));
-      selector.value = "0";
-      showTopic();
+      seminarTopics = await decodeBank(password);
+      showSection(false);
       gate.hidden = true;
       content.hidden = false;
       selector.focus();
@@ -98,6 +97,36 @@
     }
   });
 
+  function crosswordTopics() {
+    return TOPICS.map((topic, index) => {
+      const id = String(index + 1);
+      let number = 0;
+      const questions = Object.entries(topic.sections).flatMap(([section, entries]) =>
+        entries.map(([answer, prompt]) => ({ id: "К" + id + "." + (++number), section, prompt, answer }))
+      );
+      return { id, title: topic.title, questions };
+    });
+  }
+
+  function showSection(crossword) {
+    if (!seminarTopics) return;
+    topics = crossword ? crosswordTopics() : seminarTopics;
+    seminarTab.setAttribute("aria-pressed", String(!crossword));
+    crosswordTab.setAttribute("aria-pressed", String(crossword));
+    seminarTab.classList.toggle("secondary", crossword);
+    crosswordTab.classList.toggle("secondary", !crossword);
+    get("teacherTopicLabel").textContent = crossword ? "Тема кроссворда" : "Тема семинара";
+    selector.replaceChildren(...topics.map((topic, index) => {
+      const option = line("option", topic.id + ". " + topic.title);
+      option.value = String(index);
+      return option;
+    }));
+    selector.value = "0";
+    showTopic();
+  }
+
+  seminarTab.addEventListener("click", () => showSection(false));
+  crosswordTab.addEventListener("click", () => showSection(true));
   selector.addEventListener("change", showTopic);
   get("teacherRandom").addEventListener("click", () => {
     const topic = topics[Number(selector.value)];
@@ -108,6 +137,7 @@
     picked.replaceChildren(questionCard(topic, topic.questions[index]));
   });
   get("teacherLock").addEventListener("click", () => {
+    seminarTopics = null;
     topics = null;
     lastPick = -1;
     selector.replaceChildren();
